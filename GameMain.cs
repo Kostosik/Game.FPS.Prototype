@@ -2,6 +2,7 @@
 using Engine.Camera;
 using Engine.Core.Math;
 using Engine.Core.Time;
+using Engine.Graphics.Rendering;
 using Engine.Graphics.Resources;
 using Engine.Graphics3D;
 using Engine.Graphics3D.Commands;
@@ -10,6 +11,7 @@ using Engine.Graphics3D.Rendering;
 using Engine.Graphics3D.Resources;
 using Engine.Hosting.Desktop;
 using Engine.Input;
+using Engine.Input.Cursors;
 using Engine.Networking.Replication;
 using Engine.Runtime;
 using Engine.Serialization.SaveLoad.Ecs;
@@ -36,8 +38,7 @@ internal sealed class GameMain : EngineGame
     private readonly ArenaCollision _arenaCollision = new();
     private Camera3DController? _cameraController;
 
-    private Vector2 _lastPointerPosition;
-    private bool _hasLastPointerPosition;
+    private bool _forceLockedCursor;
 
     private const float MoveSpeed = 5.0f;
 
@@ -283,18 +284,24 @@ internal sealed class GameMain : EngineGame
         _camera = new Camera3D
         {
             Position = new Vector3(0.0f, 1.6f, 4.8f),
+            Rotation = Quaternion.Identity,
             FieldOfView = MathF.PI / 3.0f,
             NearPlane = 0.1f,
             FarPlane = 100.0f
         };
 
-        _camera.LookAt(
-            new Vector3(0.0f, 1.6f, 0.0f));
-
         _cameraController = new Camera3DController(_camera)
         {
             LookSensitivity = 0.0025f
         };
+
+        if (!_context.Cursor.IsModeSupported(PointerMode.Locked))
+        {
+            throw new NotSupportedException(
+                "Locked cursor mode is not supported.");
+        }
+
+        _context.Cursor.SetMode(PointerMode.Locked);
 
         UpdateCameraViewport(
             _context.WindowWidth,
@@ -304,7 +311,20 @@ internal sealed class GameMain : EngineGame
         graphics.Pipeline.PostProcessing.Clear();
 
         graphics.Pipeline.AddPass(
-            RenderPass3D.CreateWorld(SceneLighting));
+            new RenderPass(
+                Name: "World3D",
+                Target: RenderTargetHandle.Invalid,
+                State: new RenderState(
+                    RenderBlendMode.Disabled,
+                    DepthTestEnabled: true,
+                    RenderCullMode.Back),
+                ClearColor: true,
+                Layers: new RenderPassLayerRange(
+                    RenderLayers.World,
+                    RenderLayers.Present - 1))
+            {
+                ContextData = SceneLighting
+            });
 
         _shader = graphics.Shaders.Create(
             new ShaderDescription(
@@ -336,6 +356,22 @@ internal sealed class GameMain : EngineGame
         var rightInput =
             input.GetValue(FpsInputActions.MoveRight) -
             input.GetValue(FpsInputActions.MoveLeft);
+
+        if (input.IsPressed(FpsInputActions.TogglePointerLock))
+        {
+            var nextMode =
+                _context.Cursor.Mode == PointerMode.Locked
+                    ? PointerMode.Normal
+                    : PointerMode.Locked;
+
+            if (!_context.Cursor.IsModeSupported(nextMode))
+            {
+                throw new NotSupportedException(
+                    $"Cursor mode '{nextMode}' is not supported.");
+            }
+
+            _context.Cursor.SetMode(nextMode);
+        }
 
         UpdateMouseLook();
 
@@ -517,23 +553,13 @@ internal sealed class GameMain : EngineGame
         var pointer = _context.PointerInput;
 
         if (pointer is null ||
-            !pointer.IsDown(InputMouseButton.Right))
+            _context.Cursor.Mode != PointerMode.Locked)
         {
-            _hasLastPointerPosition = false;
             return;
         }
 
-        var currentPosition = pointer.Position;
-
-        if (_hasLastPointerPosition)
-        {
-            var delta = currentPosition - _lastPointerPosition;
-
-            _cameraController?.LookFromMouseDelta(delta);
-        }
-
-        _lastPointerPosition = currentPosition;
-        _hasLastPointerPosition = true;
+        _cameraController?.LookFromMouseDelta(
+            pointer.RelativeDelta);
     }
 
     protected override void OnRender(double interpolationAlpha)
@@ -692,7 +718,8 @@ internal sealed class GameMain : EngineGame
 
             _shader = ShaderHandle.Invalid;
         }
-
+        TryCleanup(() =>
+    _context.Cursor.SetMode(PointerMode.Normal));
         if (errors.Count > 0)
         {
             throw new AggregateException(

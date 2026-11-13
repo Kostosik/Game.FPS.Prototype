@@ -8,7 +8,8 @@ internal static class FpsInputActions
     public static readonly InputAction MoveBackward = new("MoveBackward");
     public static readonly InputAction MoveLeft = new("MoveLeft");
     public static readonly InputAction MoveRight = new("MoveRight");
-
+    public static readonly InputAction TogglePointerLock =
+        new("TogglePointerLock");
     public static InputActionMap CreateMap()
     {
         var map = new InputActionMap();
@@ -17,6 +18,9 @@ internal static class FpsInputActions
         map.Bind(MoveBackward, new InputBinding("Keyboard.S"));
         map.Bind(MoveLeft, new InputBinding("Keyboard.A"));
         map.Bind(MoveRight, new InputBinding("Keyboard.D"));
+        map.Bind(
+            TogglePointerLock,
+            new InputBinding("Keyboard.F1"));
 
         return map;
     }
