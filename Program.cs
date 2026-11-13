@@ -17,23 +17,28 @@ internal static class Program
                 "Game.FPS.Prototype.vibeproject");
 
         SilkNetDesktopHost.Run(
-        (DesktopGameHostContext context) => new GameMain(
-            context.Runtime,
-            startupScenePath),
-                new DesktopGameHostOptions
-                {
-                    Title = "Game.FPS.Prototype",
+            (DesktopGameHostContext context) => new GameMain(
+                context,
+                startupScenePath),
+            new DesktopGameHostOptions
+            {
+                Title = "Game.FPS.Prototype",
 
-                    ConfigureContentLoaders = loaders =>
-                    {
-                        loaders.Register(
-                            new BinaryContentLoader<UiAsset>(
-                                new UiAssetSerializer(),
-                                asset => asset.Extension.Equals(
-                                    ".ui",
-                                    StringComparison.OrdinalIgnoreCase)));
-                    }
-                });
+                InputActions = FpsInputActions.CreateMap(),
+                Width = 1280,
+                Height = 720,
+                VSync = true,
+
+                ConfigureContentLoaders = loaders =>
+                {
+                    loaders.Register(
+                        new BinaryContentLoader<UiAsset>(
+                            new UiAssetSerializer(),
+                            asset => asset.Extension.Equals(
+                                ".ui",
+                                StringComparison.OrdinalIgnoreCase)));
+                }
+            });
     }
 
     private static string ResolveStartupScenePath(
