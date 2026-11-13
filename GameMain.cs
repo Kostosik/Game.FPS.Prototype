@@ -19,6 +19,18 @@ namespace GameProject;
 
 internal sealed class GameMain : EngineGame
 {
+    private readonly ArenaRaycast _arenaRaycast = new();
+
+    private Vector3? _impactMarkerPosition;
+    private float _impactMarkerTime;
+
+    private const float WeaponRange = 40.0f;
+
+    private static readonly Material3D ImpactMaterial = new(
+        new MaterialColor(1.0f, 0.05f, 0.02f),
+        0.5f,
+        0.5f);
+
     private readonly DesktopGameHostContext _context;
     private readonly string _startupScenePath;
     private readonly ArenaCollision _arenaCollision = new();
@@ -334,6 +346,15 @@ internal sealed class GameMain : EngineGame
             return;
         }
 
+        _impactMarkerTime = MathF.Max(
+    0.0f,
+    _impactMarkerTime - deltaSeconds);
+
+        if (_context.PointerInput?.IsPressed(InputMouseButton.Left) == true)
+        {
+            FireHitscan();
+        }
+
         // Движение только по горизонтальной плоскости.
         // Взгляд вверх или вниз не должен менять высоту игрока.
         var forward = new Vector3(
@@ -370,6 +391,35 @@ internal sealed class GameMain : EngineGame
     movement * MoveSpeed * deltaSeconds);
     }
 
+    private void FireHitscan()
+    {
+        var camera = _camera;
+
+        if (camera is null)
+        {
+            return;
+        }
+
+        if (!_arenaRaycast.TryCast(
+                camera.Position,
+                camera.Forward,
+                WeaponRange,
+                out var hit))
+        {
+            _impactMarkerPosition = null;
+            Console.WriteLine("[Weapon] Miss");
+            return;
+        }
+
+        _impactMarkerPosition =
+            hit.Point + hit.Normal * 0.045f;
+
+        _impactMarkerTime = 0.2f;
+
+        Console.WriteLine(
+            $"[Weapon] Hit: {hit.ColliderName}, " +
+            $"distance: {hit.Distance:F2} m");
+    }
 
     private void MoveWithCollision(Vector3 displacement)
     {
@@ -574,6 +624,17 @@ internal sealed class GameMain : EngineGame
             OrangeMaterial,
             view,
             projection);
+
+        if (_impactMarkerTime > 0.0f &&
+    _impactMarkerPosition is Vector3 impactPosition)
+        {
+            DrawCube(
+                impactPosition,
+                new Vector3(0.09f, 0.09f, 0.09f),
+                ImpactMaterial,
+                view,
+                projection);
+        }
     }
 
     private void DrawCube(

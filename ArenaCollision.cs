@@ -58,10 +58,12 @@ internal sealed class ArenaCollision
                 position.X + stepX,
                 MinPosition,
                 MaxPosition);
-
             if (!IntersectsObstacle(nextX, position.Z))
             {
-                position.X = nextX;
+                position = new Vector3(
+                    nextX,
+                    position.Y,
+                    position.Z);
             }
 
             // Затем перемещение по Z.
@@ -74,7 +76,10 @@ internal sealed class ArenaCollision
 
             if (!IntersectsObstacle(position.X, nextZ))
             {
-                position.Z = nextZ;
+                position = new Vector3(
+                    position.X,
+                    position.Y,
+                    nextZ);
             }
         }
     }
