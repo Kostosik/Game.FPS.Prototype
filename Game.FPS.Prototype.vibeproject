@@ -1,0 +1,6 @@
+{
+  "formatVersion": 1,
+  "name": "Game.FPS.Prototype",
+  "startupProject": "Game.FPS.Prototype.csproj",
+  "startupScene": "Assets/Scenes/Main.world"
+}
