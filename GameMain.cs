@@ -42,30 +42,6 @@ internal sealed class GameMain : EngineGame
 
     private const float MoveSpeed = 5.0f;
 
-
-    private const float PlayerRadius = 0.32f;
-
-    // Внутренняя граница стен арены с учётом радиуса игрока.
-    private const float ArenaMovementLimit = 5.68f;
-
-    private const float CollisionSubstep = 0.1f;
-
-    private readonly record struct ObstacleBounds(
-        float MinX,
-        float MaxX,
-        float MinZ,
-        float MaxZ);
-
-    // Эти границы соответствуют размерам ящиков в OnRender.
-    private static readonly ObstacleBounds[] Obstacles =
-    [
-        new(-3.1f, -1.9f, -2.1f, -0.9f),
-    new( 1.6f,  2.8f, -2.9f, -1.7f),
-    new(-2.8f, -1.2f,  1.6f,  2.4f),
-    new( 2.05f, 2.95f, 0.75f, 1.65f)
-    ];
-
-
     private IMeshManager? _meshes;
     private Camera3D? _camera;
 
@@ -423,8 +399,17 @@ internal sealed class GameMain : EngineGame
             movement = movement.Normalize();
         }
 
-        MoveWithCollision(
-    movement * MoveSpeed * deltaSeconds);
+        var displacement =
+            movement * MoveSpeed * deltaSeconds;
+
+        var position = camera.Position;
+
+        _arenaCollision.Move(
+            ref position,
+            displacement.X,
+            displacement.Z);
+
+        camera.Position = position;
     }
 
     private void FireHitscan()
@@ -457,97 +442,6 @@ internal sealed class GameMain : EngineGame
             $"distance: {hit.Distance:F2} m");
     }
 
-    private void MoveWithCollision(Vector3 displacement)
-    {
-        var largestAxisDistance = MathF.Max(
-            MathF.Abs(displacement.X),
-            MathF.Abs(displacement.Z));
-
-        // Разбиваем движение на небольшие шаги,
-        // чтобы игрок не пролетал сквозь тонкие стены.
-        var steps = Math.Max(
-            1,
-            (int)MathF.Ceiling(
-                largestAxisDistance / CollisionSubstep));
-
-        var stepX = displacement.X / steps;
-        var stepZ = displacement.Z / steps;
-
-        for (var i = 0; i < steps; i++)
-        {
-            // Раздельная обработка осей позволяет скользить
-            // вдоль стены, когда одна из осей заблокирована.
-            TryMoveAxis(stepX, 0.0f);
-            TryMoveAxis(0.0f, stepZ);
-        }
-    }
-
-    private void TryMoveAxis(float deltaX, float deltaZ)
-    {
-        var camera = _camera;
-
-        if (camera is null)
-        {
-            return;
-        }
-
-        var candidateX = camera.Position.X + deltaX;
-        var candidateZ = camera.Position.Z + deltaZ;
-
-        if (IsPlayerPositionBlocked(candidateX, candidateZ))
-        {
-            return;
-        }
-
-        camera.Position = new Vector3(
-            candidateX,
-            camera.Position.Y,
-            candidateZ);
-    }
-
-    private bool IsPlayerPositionBlocked(float x, float z)
-    {
-        // Границы арены.
-        if (x < -ArenaMovementLimit ||
-            x > ArenaMovementLimit ||
-            z < -ArenaMovementLimit ||
-            z > ArenaMovementLimit)
-        {
-            return true;
-        }
-
-        var radiusSquared = PlayerRadius * PlayerRadius;
-
-        foreach (var obstacle in Obstacles)
-        {
-            // Ближайшая к игроку точка прямоугольника.
-            var closestX = Math.Clamp(
-                x,
-                obstacle.MinX,
-                obstacle.MaxX);
-
-            var closestZ = Math.Clamp(
-                z,
-                obstacle.MinZ,
-                obstacle.MaxZ);
-
-            var differenceX = x - closestX;
-            var differenceZ = z - closestZ;
-
-            var distanceSquared =
-                differenceX * differenceX +
-                differenceZ * differenceZ;
-
-            if (distanceSquared < radiusSquared)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-
     private void UpdateMouseLook()
     {
         var pointer = _context.PointerInput;
@@ -576,80 +470,15 @@ internal sealed class GameMain : EngineGame
         var view = camera.ViewMatrix;
         var projection = camera.ProjectionMatrix;
 
-        // Floor.
-        DrawCube(
-            new Vector3(0.0f, -0.15f, 0.0f),
-            new Vector3(12.4f, 0.3f, 12.4f),
-            FloorMaterial,
-            view,
-            projection);
-
-        // Ceiling.
-        DrawCube(
-            new Vector3(0.0f, 3.15f, 0.0f),
-            new Vector3(12.4f, 0.3f, 12.4f),
-            CeilingMaterial,
-            view,
-            projection);
-
-        // Left and right walls.
-        DrawCube(
-            new Vector3(-6.15f, 1.5f, 0.0f),
-            new Vector3(0.3f, 3.0f, 12.4f),
-            WallMaterial,
-            view,
-            projection);
-
-        DrawCube(
-            new Vector3(6.15f, 1.5f, 0.0f),
-            new Vector3(0.3f, 3.0f, 12.4f),
-            WallMaterial,
-            view,
-            projection);
-
-        // Front and back walls.
-        DrawCube(
-            new Vector3(0.0f, 1.5f, -6.15f),
-            new Vector3(12.4f, 3.0f, 0.3f),
-            WallMaterial,
-            view,
-            projection);
-
-        DrawCube(
-            new Vector3(0.0f, 1.5f, 6.15f),
-            new Vector3(12.4f, 3.0f, 0.3f),
-            WallMaterial,
-            view,
-            projection);
-
-        // Arena obstacles.
-        DrawCube(
-            new Vector3(-2.5f, 0.75f, -1.5f),
-            new Vector3(1.2f, 1.5f, 1.2f),
-            OrangeMaterial,
-            view,
-            projection);
-
-        DrawCube(
-            new Vector3(2.2f, 0.5f, -2.3f),
-            new Vector3(1.2f, 1.0f, 1.2f),
-            GreenMaterial,
-            view,
-            projection);
-
-        DrawCube(
-            new Vector3(-2.0f, 0.6f, 2.0f),
-            new Vector3(1.6f, 1.2f, 0.8f),
-            GreenMaterial,
-            view,
-            projection);
-
-        DrawCube(
-            new Vector3(2.5f, 1.0f, 1.2f),
-            new Vector3(0.9f, 2.0f, 0.9f),
-            OrangeMaterial,
-            view,
-            projection);
+        foreach (var box in ArenaGeometry.All)
+        {
+            DrawCube(
+                box.Center,
+                box.Size,
+                ResolveArenaMaterial(box.Surface),
+                view,
+                projection);
+        }
 
         if (_impactMarkerTime > 0.0f &&
     _impactMarkerPosition is Vector3 impactPosition)
@@ -661,6 +490,24 @@ internal sealed class GameMain : EngineGame
                 view,
                 projection);
         }
+    }
+
+    private static Material3D ResolveArenaMaterial(
+    ArenaSurface surface)
+    {
+        return surface switch
+        {
+            ArenaSurface.Floor => FloorMaterial,
+            ArenaSurface.Ceiling => CeilingMaterial,
+            ArenaSurface.Wall => WallMaterial,
+            ArenaSurface.Orange => OrangeMaterial,
+            ArenaSurface.Green => GreenMaterial,
+
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(surface),
+                surface,
+                "Unknown arena surface.")
+        };
     }
 
     private void DrawCube(

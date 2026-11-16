@@ -5,49 +5,6 @@ namespace GameProject;
 
 internal sealed class ArenaRaycast
 {
-    private readonly Collider[] _colliders =
-    [
-        new("Floor",
-            new Vector3(-6.2f, -0.3f, -6.2f),
-            new Vector3( 6.2f,  0.0f,  6.2f)),
-
-        new("Ceiling",
-            new Vector3(-6.2f, 3.0f, -6.2f),
-            new Vector3( 6.2f, 3.3f,  6.2f)),
-
-        new("Left wall",
-            new Vector3(-6.3f, 0.0f, -6.2f),
-            new Vector3(-6.0f, 3.0f,  6.2f)),
-
-        new("Right wall",
-            new Vector3(6.0f, 0.0f, -6.2f),
-            new Vector3(6.3f, 3.0f,  6.2f)),
-
-        new("Back wall",
-            new Vector3(-6.2f, 0.0f, -6.3f),
-            new Vector3( 6.2f, 3.0f, -6.0f)),
-
-        new("Front wall",
-            new Vector3(-6.2f, 0.0f, 6.0f),
-            new Vector3( 6.2f, 3.0f, 6.3f)),
-
-        new("Obstacle 1",
-            new Vector3(-3.1f, 0.0f, -2.1f),
-            new Vector3(-1.9f, 1.5f, -0.9f)),
-
-        new("Obstacle 2",
-            new Vector3(1.6f, 0.0f, -2.9f),
-            new Vector3(2.8f, 1.0f, -1.7f)),
-
-        new("Obstacle 3",
-            new Vector3(-2.8f, 0.0f, 1.6f),
-            new Vector3(-1.2f, 1.2f, 2.4f)),
-
-        new("Obstacle 4",
-            new Vector3(2.05f, 0.0f, 0.75f),
-            new Vector3(2.95f, 2.0f, 1.65f))
-    ];
-
     public bool TryCast(
         Vector3 origin,
         Vector3 direction,
@@ -67,11 +24,11 @@ internal sealed class ArenaRaycast
 
         direction = direction.Normalize();
 
-        Collider? nearestCollider = null;
+        ArenaBoxDefinition? nearestCollider = null;
         Vector3 nearestNormal = Vector3.Zero;
         var nearestDistance = maxDistance;
 
-        foreach (var collider in _colliders)
+        foreach (var collider in ArenaGeometry.All)
         {
             if (!IntersectAabb(
                     origin,
@@ -112,7 +69,7 @@ internal sealed class ArenaRaycast
     private static bool IntersectAabb(
         Vector3 origin,
         Vector3 direction,
-        Collider collider,
+        ArenaBoxDefinition collider,
         float maxDistance,
         out float distance,
         out Vector3 normal)
@@ -208,11 +165,6 @@ internal sealed class ArenaRaycast
 
         return near <= far;
     }
-
-    private readonly record struct Collider(
-        string Name,
-        Vector3 Min,
-        Vector3 Max);
 }
 
 internal readonly record struct ArenaRaycastHit(
